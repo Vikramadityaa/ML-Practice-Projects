@@ -3,6 +3,7 @@ import random
 from langchain_huggingface import HuggingFacePipeline
 from langchain.prompts import PromptTemplate
 from transformers import pipeline
+import json
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -54,19 +55,36 @@ def generate_question(topic):
         logger.error(f"Error generating question: {e}")
         return "Could not generate a question."
 
-
 evaluation_prompt = PromptTemplate(
     input_variables=["question", "answer"],
-    template="Given the question: '{question}', and the answer: '{answer}', provide a correctness score from 0 to 10 and suggest a correct answer."
+    template=(
+        "You are an AI evaluator. Given the question: '{question}' and the answer: '{answer}', "
+        "provide a JSON response with two keys: 'score' (integer from 0 to 10) and 'correct_answer' (string). "
+        "DO NOT include any extra words or explanations. Only return JSON.\n\n"
+        "Example response:\n"
+        '{ "score": 8, "correct_answer": "The correct answer is 2025." }'
+    )
 )
 
 def evaluate_answer(question_text, answer_text):
     """Evaluate an answer using LangChain and return a score along with a correct answer."""
     response = llm.invoke(evaluation_prompt.format(question=question_text, answer=answer_text))
+    print(response)  # Debugging: Check what LLM is returning
+    print(llm.invoke("Say Hello"))
 
-    # Extract score (mocking an actual evaluation by randomly generating a score for now)
-    score = random.randint(0, 10)
-    correct_answer = response if response else "Not Available"
+    try:
+        # Ensure the response is in JSON format
+        response_data = json.loads(response)
+        score = response_data.get("score", 0)
+        correct_answer = response_data.get("correct_answer", "Not Available")
+    except json.JSONDecodeError:
+        # Fallback if response is not in JSON format
+        score = 0
+        correct_answer = "Not Available"
 
     logger.info(f"Evaluation: Score: {score}, Correct Answer: {correct_answer}")
     return {"score": score, "correct_answer": correct_answer}
+
+
+if __name__ == "__main__":
+    evaluate_answer("Which year is this?", "2025")

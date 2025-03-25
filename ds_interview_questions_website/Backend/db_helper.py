@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Database Setup
 DATABASE_URL = "mysql+mysqlconnector://root:root@localhost/workout_base"
-engine = create_engine(DATABASE_URL)gi
+engine = create_engine(DATABASE_URL)
 SessionLocal =   sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -66,34 +66,39 @@ class Score(Base):
 Base.metadata.create_all(bind=engine)
 
 # Utility functions
-def register_user(username, password):
-    with get_db_session() as db:
-        hashed_password = pwd_context.hash(password)
-        user = User(username=username, hashed_password=hashed_password)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"User registered: {username}")
-        return {"message": "User registered successfully"}
+def register_user(db, username, password):
+    hashed_password = pwd_context.hash(password)
+    user = User(username=username, hashed_password=hashed_password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    logger.info(f"User registered: {username}")
+    return {"message": "User registered successfully"}
 
 
-def authenticate_user(username, password):
-    with get_db_session() as db:
-        user = db.query(User).filter(User.username == username).first()
-        if user and pwd_context.verify(password, user.hashed_password):
-            logger.info(f"User authenticated: {username}")
-            return {"message": "Login successful", "user_id": user.id}
-        logger.warning(f"Failed login attempt for username: {username}")
-        return {"message": "Invalid credentials"}
+def authenticate_user(db, username, password):
+    user = db.query(User).filter(User.username == username).first()
+    if user and pwd_context.verify(password, user.hashed_password):
+        logger.info(f"User authenticated: {username}")
+        return {"message": "Login successful", "user_id": user.id}
+    logger.warning(f"Failed login attempt for username: {username}")
+    return {"message": "Invalid credentials"}
 
 
-def fetch_questions(db, topic, today):
+def fetch_questions(db, topic=None, today=None):
+    """Fetch questions from the database based on optional topic and date filters."""
     try:
-        questions = db.query(Question).filter(Question.date_added == today, Question.topic == topic).all()
+        query = db.query(Question)
+        if topic:
+            query = query.filter(Question.topic == topic)
+        if today:
+            query = query.filter(Question.date_added == today)
+
+        questions = query.all()
         logger.info(f"Fetched {len(questions)} questions for topic '{topic}' on {today}: {questions}")
         return questions
     except Exception as e:
-        logger.error(f"Error fetching questions for topic '{topic}' on {today}: {e}")
+        logger.error(f"Error fetching questions: {e}")
         return []  # Return an empty list if an error occurs
 
 
@@ -108,26 +113,24 @@ def save_question(db, topic, question_text, today):
         db.rollback()  # Rollback if there's an error
         logger.error(f"Error saving question: {e}")
 
-def save_answer(user_id, question_id, answer_text, score):
-    with get_db_session() as db:
-        answer = Answer(user_id=user_id, question_id=question_id, answer_text=answer_text, score=score)
-        db.add(answer)
-        db.commit()
-        db.refresh(answer)
+def save_answer(db, user_id, question_id, answer_text, score):
+    answer = Answer(user_id=user_id, question_id=question_id, answer_text=answer_text, score=score)
+    db.add(answer)
+    db.commit()
+    db.refresh(answer)
 
-        user_score = db.query(Score).filter(Score.user_id == user_id).first()
-        if not user_score:
-            user_score = Score(user_id=user_id, total_score=0)
-            db.add(user_score)
+    user_score = db.query(Score).filter(Score.user_id == user_id).first()
+    if not user_score:
+        user_score = Score(user_id=user_id, total_score=0)
+        db.add(user_score)
 
-        user_score.total_score += score
-        db.commit()
-        logger.info(f"Answer saved for user {user_id} with score {score}")
-        return {"message": "Answer submitted and scored"}
+    user_score.total_score += score
+    db.commit()
+    logger.info(f"Answer saved for user {user_id} with score {score}")
+    return {"message": "Answer submitted and scored"}
 
 
-def fetch_scoreboard():
-    with get_db_session() as db:
-        scoreboard = db.query(User.username, Score.total_score).join(Score).order_by(Score.total_score.desc()).all()
-        logger.info(f"Fetched scoreboard: {scoreboard}")
-        return scoreboard
+def fetch_scoreboard(db):
+    scoreboard = db.query(User.username, Score.total_score).join(Score).order_by(Score.total_score.desc()).all()
+    logger.info(f"Fetched scoreboard: {scoreboard}")
+    return scoreboard
