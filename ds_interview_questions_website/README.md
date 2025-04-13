@@ -1,7 +1,3 @@
-Here's a clean and structured `README.md` draft for your interview questions website project:
-
----
-
 # 🧠 Daily Interview Questions Platform
 
 An interactive web platform that helps users practice and improve their ML/DL/Python skills through daily interview-style questions. Users choose a topic, receive 5 AI-generated questions each day, submit answers, and get scored automatically. A leaderboard tracks daily performance across users (WIP).
@@ -85,5 +81,3 @@ An interactive web platform that helps users practice and improve their ML/DL/Py
 > Coming Soon – Will include setup and run instructions here once deployment begins.
 
 ---
-
-Let me know if you want a version with badges, a setup guide, or API endpoint documentation!
